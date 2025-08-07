@@ -8,7 +8,7 @@ This is a simple Shogi (Japanese Chess) game that allows you to play against a c
 3. Start playing Shogi against the computer!
 
 ## About the Project
-This Shogi game was created using ChatGPT o1 in approximately 30 minutes. Additionally, this README.md file was also written using ChatGPT, showcasing the versatility of AI-assisted development and documentation.
+This Shogi game was created using ChatGPT o1 in approximately 30 minutes. The difficulty levels were added by the AI software engineer, Jules. Additionally, this README.md file was also written using ChatGPT, showcasing the versatility of AI-assisted development and documentation.
 
 Feel free to explore, modify, and improve the code and documentation as you like!
 
@@ -27,7 +27,7 @@ This project is open-source and free to use under the MIT License.
 3. コンピュータと将棋をプレイしましょう！
 
 ## プロジェクトについて
-この将棋ゲームは、ChatGPT o1 を使用して約30分で作成されました。また、このREADME.mdファイルもChatGPTを使用して作成されています。AIによる開発とドキュメント作成の柔軟性を示しています。
+この将棋ゲームは、ChatGPT o1 を使用して約30分で作成されました。難易度機能は、AIソフトウェアエンジニアのJulesによって追加されました。また、このREADME.mdファイルもChatGPTを使用して作成されています。AIによる開発とドキュメント作成の柔軟性を示しています。
 
 ぜひコードやドキュメントを自由に探索、変更、改善してください！
 

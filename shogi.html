@@ -45,6 +45,24 @@ body {
     background-color: #ff9933;
     border-color: #996600;
 }
+#difficulty-selection {
+    margin-bottom: 20px;
+}
+.difficulty-btn {
+    margin: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #ffcc66;
+    border: 2px solid #cc9900;
+    border-radius: 8px;
+    color: #663300;
+    font-weight: bold;
+}
+.difficulty-btn:hover {
+    background-color: #ff9933;
+    border-color: #996600;
+}
 
 #game-container {
     display: flex;
@@ -160,9 +178,17 @@ body {
 <body>
 <div class="start-screen" id="start-screen">
     <h1>将棋ゲームへようこそ</h1>
-    <p>どちらをプレイしますか？</p>
-    <button id="play-sente">先手でプレイ</button>
-    <button id="play-gote">後手でプレイ</button>
+    <p id="difficulty-prompt">難易度を選択してください:</p>
+    <div id="difficulty-selection">
+        <button class="difficulty-btn" data-difficulty="1">簡単</button>
+        <button class="difficulty-btn" data-difficulty="2">普通</button>
+        <button class="difficulty-btn" data-difficulty="3">難しい</button>
+    </div>
+    <div id="side-selection" style="display:none;">
+        <p>どちらをプレイしますか？</p>
+        <button id="play-sente">先手でプレイ</button>
+        <button id="play-gote">後手でプレイ</button>
+    </div>
 </div>
 <div id="game-container" style="display:none;">
     <table id="board"></table>
@@ -263,6 +289,7 @@ let playerSide = 'sente';
 let gameOver = false;
 let lastComputerMove = null;
 let possibleMoves = [];
+let difficultyLevel = 1;
 
 // 二歩チェック
 function hasPawnInColumn(side, col) {
@@ -623,17 +650,17 @@ function getAllLegalMoves(side) {
         }
     }
     // hand drops
-    for (let i=0;i<hand.length;i++){
-        let hp=hand[i];
-        let dm=getDropMoves(side,hp);
-        dm.forEach(m=>{
+    const uniqueHand = [...new Set(hand)];
+    uniqueHand.forEach(hp => {
+        let dm = getDropMoves(side, hp);
+        dm.forEach(m => {
             moves.push({
-                from:null,
-                to:{r:m.r,c:m.c},
-                drop:hp
+                from: null,
+                to: { r: m.r, c: m.c },
+                drop: hp
             });
         });
-    }
+    });
     return moves;
 }
 
@@ -747,26 +774,121 @@ function applyMove(move, st, sc, gc, side) {
     if(move.drop){
         st[move.to.r][move.to.c] = (side==='sente') ? move.drop.toUpperCase() : move.drop.toLowerCase();
         let cap = (side==='sente')?sc:gc;
-        let idx = cap.indexOf(move.drop);
+        let idx = cap.findIndex(p => p.toUpperCase() === move.drop.toUpperCase());
         if(idx>=0) cap.splice(idx,1);
     } else {
         let piece = st[move.from.r][move.from.c];
         st[move.from.r][move.from.c]=null;
         let captured=st[move.to.r][move.to.c];
+
         let promotionZone = (side==='sente')?[0,1,2]:[6,7,8];
-        if(canPromote(piece) && (promotionZone.includes(move.from.r)||promotionZone.includes(move.to.r))) {
+        if(canPromote(piece) && !isPromoted(piece) && (promotionZone.includes(move.from.r) || promotionZone.includes(move.to.r))) {
             piece = promote(piece);
         }
 
         if(captured) {
             let capturedBase = basePiece(captured).toUpperCase();
-            let capturedPiece = (side==='sente') ? capturedBase : capturedBase.toLowerCase();
-            if(side==='sente') sc.push(capturedPiece); 
-            else gc.push(capturedPiece);
+            let capturedPieceForHand = (side === 'sente') ? capturedBase : capturedBase.toLowerCase();
+            if(side==='sente') sc.push(capturedPieceForHand);
+            else gc.push(capturedPieceForHand);
         }
         st[move.to.r][move.to.c] = piece;
     }
 }
+
+const PIECE_VALUES = {
+    'K': 1000, 'R': 10, 'B': 10, 'G': 7, 'S': 6, 'N': 5, 'L': 4, 'P': 1,
+    '+R': 12, '+B': 12, '+S': 8, '+N': 8, '+L': 8, '+P': 7
+};
+function getPieceValue(piece) {
+    if (!piece) return 0;
+    let p = basePiece(piece);
+    let key = isPromoted(piece) ? `+${p.toUpperCase()}` : p.toUpperCase();
+    return PIECE_VALUES[key] || 0;
+}
+
+function hasPawnInColumnForState(side, col, state) {
+    for(let rr=0; rr<9; rr++){
+        let p = state[rr][col];
+        if(p && pieceOwner(p)===side && basePiece(p).toUpperCase()==='P' && !isPromoted(p)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function canDropHereForState(side, piece, r, c, state) {
+    let bp = basePiece(piece).toUpperCase();
+    if(bp==='P') {
+        if(hasPawnInColumnForState(side, c, state)) return false;
+    }
+    if(bp==='P' || bp==='L') {
+        if(side==='sente' && r===0) return false;
+        if(side==='gote' && r===8) return false;
+    } else if(bp==='N') {
+        if(side==='sente' && (r===0 || r===1)) return false;
+        if(side==='gote' && (r===8 || r===7)) return false;
+    }
+    return true;
+}
+
+function getDropMovesForState(side, piece, state) {
+    let moves = [];
+    for(let rr=0;rr<9;rr++){
+        for(let cc=0;cc<9;cc++){
+            if(!state[rr][cc]){
+                if(canDropHereForState(side,piece,rr,cc, state)) {
+                    moves.push({r:rr,c:cc});
+                }
+            }
+        }
+    }
+    return moves;
+}
+
+function getAllLegalMovesForState(side, state, sc, gc) {
+    let moves = [];
+    let hand = (side==='sente')? sc : gc;
+    for(let r=0;r<9;r++){
+        for(let c=0;c<9;c++){
+            let p=state[r][c];
+            if(p && pieceOwner(p)===side){
+                let ms=getMovesForState(r,c,p,state);
+                ms.forEach(m=>{
+                    moves.push({ from:{r:r,c:c}, to:{r:m.r,c:m.c}, drop:null });
+                });
+            }
+        }
+    }
+    const uniqueHand = [...new Set(hand)];
+    uniqueHand.forEach(hp => {
+        let dm=getDropMovesForState(side,hp,state);
+        dm.forEach(m=>{
+            moves.push({ from:null, to:{r:m.r,c:m.c}, drop:hp });
+        });
+    });
+    return moves;
+}
+
+function evaluateBoard(state, sc, gc, side) {
+    let score = 0;
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            const piece = state[r][c];
+            if (piece) {
+                const value = getPieceValue(piece);
+                if (pieceOwner(piece) === side) score += value;
+                else score -= value;
+            }
+        }
+    }
+    const myCaptured = (side === 'sente') ? sc : gc;
+    myCaptured.forEach(p => { score += getPieceValue(p); });
+    const enemyCaptured = (side === 'sente') ? gc : sc;
+    enemyCaptured.forEach(p => { score -= getPieceValue(p); });
+    return score;
+}
+
 
 function showResult(winner) {
     let resultEl = document.getElementById('game-result');
@@ -883,6 +1005,79 @@ function playerClickCell(r,c) {
     }
 }
 
+function getBestMoveLevel2(moves, side) {
+    let bestScore = -Infinity;
+    let bestMoves = [];
+
+    for (const move of moves) {
+        let score = 0;
+        if (!move.drop && move.to) {
+            const capturedPiece = boardState[move.to.r][move.to.c];
+            if (capturedPiece) {
+                score = getPieceValue(capturedPiece);
+            }
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMoves = [move];
+        } else if (score === bestScore) {
+            bestMoves.push(move);
+        }
+    }
+
+    if (bestMoves.length > 0 && bestScore > 0) {
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    } else {
+        return moves[Math.floor(Math.random() * moves.length)];
+    }
+}
+
+function getBestMoveLevel3(moves, side) {
+    let bestScore = -Infinity;
+    let bestMoves = [];
+    const opponent = (side === 'sente') ? 'gote' : 'sente';
+
+    for (const move of moves) {
+        let tempBoard = JSON.parse(JSON.stringify(boardState));
+        let tempSenteCaptured = [...senteCaptured];
+        let tempGoteCaptured = [...goteCaptured];
+        applyMove(move, tempBoard, tempSenteCaptured, tempGoteCaptured, side);
+
+        let minOpponentScore = Infinity;
+        const opponentMoves = getAllLegalMovesForState(opponent, tempBoard, tempSenteCaptured, tempGoteCaptured);
+
+        if (opponentMoves.length === 0) {
+            minOpponentScore = Infinity;
+        } else {
+            for (const opponentMove of opponentMoves) {
+                let oppTempBoard = JSON.parse(JSON.stringify(tempBoard));
+                let oppTempSenteCaptured = [...tempSenteCaptured];
+                let oppTempGoteCaptured = [...tempGoteCaptured];
+                applyMove(opponentMove, oppTempBoard, oppTempSenteCaptured, oppTempGoteCaptured, opponent);
+
+                const score = evaluateBoard(oppTempBoard, oppTempSenteCaptured, oppTempGoteCaptured, side);
+                if (score < minOpponentScore) {
+                    minOpponentScore = score;
+                }
+            }
+        }
+
+        if (minOpponentScore > bestScore) {
+            bestScore = minOpponentScore;
+            bestMoves = [move];
+        } else if (minOpponentScore === bestScore) {
+            bestMoves.push(move);
+        }
+    }
+
+    if (bestMoves.length > 0) {
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    } else {
+        return moves[Math.floor(Math.random() * moves.length)];
+    }
+}
+
 function computerMove() {
     if (gameOver) return;
     let moves=getAllLegalMoves(turn);
@@ -895,12 +1090,6 @@ function computerMove() {
             applyMove(m,sb,ssc,sgc,turn);
             return !isCheck(turn, sb);
         });
-        if(moves.length===0) {
-            gameOver=true;
-            let winner=(turn==='sente')?'gote':'sente';
-            showResult(winner);
-            return;
-        }
     }
 
     if(moves.length===0) {
@@ -909,7 +1098,20 @@ function computerMove() {
         showResult(winner);
         return;
     }
-    let move = moves[Math.floor(Math.random()*moves.length)];
+
+    let move;
+    if (difficultyLevel == 1) {
+        move = moves[Math.floor(Math.random()*moves.length)];
+    } else if (difficultyLevel == 2) {
+        move = getBestMoveLevel2(moves, turn);
+    } else { // difficultyLevel === 3
+        move = getBestMoveLevel3(moves, turn);
+    }
+
+    if (!move) { // Fallback
+        move = moves[Math.floor(Math.random()*moves.length)];
+    }
+
     lastComputerMove = JSON.parse(JSON.stringify(move));
     makeMove(move);
 }
@@ -922,24 +1124,33 @@ boardEl.addEventListener('click', (e)=>{
     playerClickCell(r,c);
 });
 
-document.getElementById('play-sente').addEventListener('click',()=>{
-    playerSide='sente';
-    turn='sente';
-    document.getElementById('start-screen').style.display='none';
-    document.getElementById('game-container').style.display='flex';
+document.querySelectorAll('.difficulty-btn').forEach(button => {
+    button.addEventListener('click', (e) => {
+        difficultyLevel = parseInt(e.target.dataset.difficulty);
+        document.getElementById('difficulty-selection').style.display = 'none';
+        document.getElementById('difficulty-prompt').style.display = 'none';
+        document.getElementById('side-selection').style.display = 'block';
+    });
+});
+
+document.getElementById('play-sente').addEventListener('click', () => {
+    playerSide = 'sente';
+    turn = 'sente';
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'flex';
     renderBoard();
 });
 
-document.getElementById('play-gote').addEventListener('click',()=>{
-    playerSide='gote';
-    turn='sente';
-    document.getElementById('start-screen').style.display='none';
-    document.getElementById('game-container').style.display='flex';
+document.getElementById('play-gote').addEventListener('click', () => {
+    playerSide = 'gote';
+    turn = 'sente';
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'flex';
     renderBoard();
-    if(turn!==playerSide){
-        setTimeout(()=>{
+    if (turn !== playerSide) {
+        setTimeout(() => {
             computerMove();
-        },500);
+        }, 500);
     }
 });
 </script>
