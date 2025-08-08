@@ -258,7 +258,8 @@ function isPromoted(piece) {
 
 function promote(piece) {
     if (!isPromoted(piece)) {
-        return piece[0] + '+';
+        // Preserve the original piece letter when adding the promotion marker
+        return basePiece(piece) + '+';
     }
     return piece;
 }
